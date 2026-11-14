@@ -1,9 +1,4 @@
-import {
-  type BarcodeScanningResult,
-  type BarcodeType,
-  CameraView,
-  useCameraPermissions,
-} from "expo-camera";
+import { type BarcodeType, useCameraPermissions } from "expo-camera";
 import { router } from "expo-router";
 import { useRef, useState } from "react";
 import {
@@ -19,6 +14,10 @@ import {
 } from "react-native";
 
 import { BarcodeImage } from "@/components/barcode-image";
+import {
+  BarcodeScanner,
+  type ScannedBarcode,
+} from "@/components/barcode-scanner";
 import { findBarcode, saveBarcode, typeLabel } from "@/lib/barcodes";
 
 type Pending = {
@@ -53,7 +52,7 @@ export default function ScanScreen() {
   const [saving, setSaving] = useState(false);
   const { width } = useWindowDimensions();
 
-  async function onBarcodeScanned({ data, type }: BarcodeScanningResult) {
+  async function onBarcodeScanned({ data, type }: ScannedBarcode) {
     // The camera fires many times per second; only take the first hit.
     if (handled.current || !data) return;
     handled.current = true;
@@ -167,11 +166,10 @@ export default function ScanScreen() {
 
   return (
     <View style={styles.container}>
-      <CameraView
-        style={StyleSheet.absoluteFill}
-        facing="back"
-        barcodeScannerSettings={{ barcodeTypes: BARCODE_TYPES }}
-        onBarcodeScanned={handled.current ? undefined : onBarcodeScanned}
+      <BarcodeScanner
+        barcodeTypes={BARCODE_TYPES}
+        onScanned={onBarcodeScanned}
+        paused={!!pending}
       />
       <View style={styles.overlay} pointerEvents="none">
         <View style={styles.frame} />
