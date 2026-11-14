@@ -41,3 +41,6 @@ example
 # generated native folders
 /ios
 /android
+
+# copied from node_modules on postinstall (scripts/copy-zxing-wasm.js)
+public/zxing_reader.wasm
