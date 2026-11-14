@@ -19,7 +19,25 @@ export type SavedBarcode = {
   type: string;
   /** ISO timestamp of when it was saved. */
   createdAt: string;
+  /** What the user called it, e.g. "Library card". Older entries may not have one. */
+  name?: string;
 };
+
+/** The name to show for a barcode, falling back to its type for unnamed ones. */
+export function displayName(barcode: SavedBarcode): string {
+  return barcode.name?.trim() || typeLabel(barcode.type);
+}
+
+/** Finds an already-saved barcode with the same value and type, if any. */
+export async function findBarcode(
+  data: string,
+  type: string,
+): Promise<SavedBarcode | undefined> {
+  const normalizedType = normalizeType(type);
+  return (await loadBarcodes()).find(
+    (b) => b.data === data && normalizeType(b.type) === normalizedType,
+  );
+}
 
 export async function loadBarcodes(): Promise<SavedBarcode[]> {
   const raw = await AsyncStorage.getItem(STORAGE_KEY);
@@ -37,13 +55,14 @@ async function writeBarcodes(barcodes: SavedBarcode[]): Promise<void> {
 }
 
 /**
- * Saves a scanned barcode, newest first. Scanning a barcode that is already saved
- * moves it to the front instead of adding a duplicate.
- * Returns true if it was new.
+ * Saves a scanned barcode with its name, newest first. Saving a barcode that is
+ * already saved moves it to the front and updates its name instead of adding a
+ * duplicate. Returns true if it was new.
  */
 export async function saveBarcode(
   data: string,
   type: string,
+  name: string,
 ): Promise<boolean> {
   const existing = await loadBarcodes();
   const normalizedType = normalizeType(type);
@@ -51,14 +70,31 @@ export async function saveBarcode(
     (b) => b.data === data && normalizeType(b.type) === normalizedType,
   );
   const rest = existing.filter((b) => b !== duplicate);
-  const entry: SavedBarcode = duplicate ?? {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    data,
-    type: normalizedType,
-    createdAt: new Date().toISOString(),
+  const trimmed = name.trim();
+  const entry: SavedBarcode = {
+    ...(duplicate ?? {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      data,
+      type: normalizedType,
+      createdAt: new Date().toISOString(),
+    }),
+    name: trimmed || undefined,
   };
   await writeBarcodes([entry, ...rest]);
   return !duplicate;
+}
+
+/** Changes a saved barcode's name. An empty name clears it. */
+export async function renameBarcode(
+  id: string,
+  name: string,
+): Promise<SavedBarcode[]> {
+  const trimmed = name.trim();
+  const next = (await loadBarcodes()).map((b) =>
+    b.id === id ? { ...b, name: trimmed || undefined } : b,
+  );
+  await writeBarcodes(next);
+  return next;
 }
 
 export async function deleteBarcode(id: string): Promise<SavedBarcode[]> {

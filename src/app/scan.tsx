@@ -6,9 +6,27 @@ import {
 } from "expo-camera";
 import { router } from "expo-router";
 import { useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from "react-native";
 
-import { saveBarcode, typeLabel } from "@/lib/barcodes";
+import { BarcodeImage } from "@/components/barcode-image";
+import { findBarcode, saveBarcode, typeLabel } from "@/lib/barcodes";
+
+type Pending = {
+  data: string;
+  type: string;
+  /** True if this barcode was already saved; saving updates its name. */
+  existing: boolean;
+};
 
 const BARCODE_TYPES: BarcodeType[] = [
   "qr",
@@ -29,21 +47,42 @@ const BARCODE_TYPES: BarcodeType[] = [
 export default function ScanScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const handled = useRef(false);
-  const [status, setStatus] = useState<string | null>(null);
+  const [pending, setPending] = useState<Pending | null>(null);
+  const [name, setName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const { width } = useWindowDimensions();
 
   async function onBarcodeScanned({ data, type }: BarcodeScanningResult) {
-    // The camera fires many times per second; only save the first hit.
+    // The camera fires many times per second; only take the first hit.
     if (handled.current || !data) return;
     handled.current = true;
+    const existing = await findBarcode(data, type).catch(() => undefined);
+    setName(existing?.name ?? "");
+    setError(null);
+    setPending({ data, type, existing: !!existing });
+  }
+
+  function scanAgain() {
+    setPending(null);
+    setName("");
+    setError(null);
+    handled.current = false;
+  }
+
+  async function save() {
+    if (!pending || saving) return;
+    if (!name.trim()) {
+      setError("Give it a name so you can find it later.");
+      return;
+    }
+    setSaving(true);
     try {
-      const isNew = await saveBarcode(data, type);
-      setStatus(
-        isNew ? `Saved ${typeLabel(type)}` : `Already saved, moved to front`,
-      );
-      setTimeout(() => router.back(), 600);
+      await saveBarcode(pending.data, pending.type, name);
+      router.back();
     } catch {
-      setStatus("Couldn't save that barcode. Try again.");
-      handled.current = false;
+      setError("Couldn't save that barcode. Try again.");
+      setSaving(false);
     }
   }
 
@@ -70,6 +109,62 @@ export default function ScanScreen() {
     );
   }
 
+  if (pending) {
+    const previewWidth = Math.min(width - 48, 420);
+    return (
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={styles.form}
+          keyboardShouldPersistTaps="handled"
+        >
+          <BarcodeImage
+            data={pending.data}
+            type={pending.type}
+            maxWidth={previewWidth}
+            maxHeight={180}
+          />
+          <Text style={styles.hint}>
+            {typeLabel(pending.type)} · {pending.data}
+          </Text>
+          {pending.existing && (
+            <Text style={styles.hint}>
+              You've already saved this one. Saving updates its name.
+            </Text>
+          )}
+          <Text style={styles.label}>Name</Text>
+          <TextInput
+            style={[styles.input, { width: previewWidth }]}
+            value={name}
+            onChangeText={(t) => {
+              setName(t);
+              if (error) setError(null);
+            }}
+            placeholder="e.g. Library card"
+            autoFocus
+            maxLength={60}
+            returnKeyType="done"
+            onSubmitEditing={save}
+            accessibilityLabel="Barcode name"
+          />
+          {error && <Text style={styles.error}>{error}</Text>}
+          <Pressable
+            style={[styles.button, { width: previewWidth }, saving && styles.disabled]}
+            onPress={save}
+            disabled={saving}
+          >
+            <Text style={styles.buttonText}>Save</Text>
+          </Pressable>
+          <Pressable onPress={scanAgain} hitSlop={8}>
+            <Text style={styles.secondary}>Scan a different barcode</Text>
+          </Pressable>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <CameraView
@@ -81,7 +176,7 @@ export default function ScanScreen() {
       <View style={styles.overlay} pointerEvents="none">
         <View style={styles.frame} />
         <Text style={styles.overlayText}>
-          {status ?? "Point the camera at a barcode"}
+          Point the camera at a barcode
         </Text>
       </View>
     </View>
@@ -89,6 +184,43 @@ export default function ScanScreen() {
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
+  form: {
+    flexGrow: 1,
+    alignItems: "center",
+    padding: 24,
+    gap: 12,
+  },
+  label: {
+    marginTop: 12,
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  input: {
+    fontSize: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#C4CBD3",
+    backgroundColor: "#FFFFFF",
+    color: "#111",
+    textAlign: "center",
+  },
+  error: {
+    color: "#D93025",
+    fontSize: 14,
+  },
+  disabled: {
+    opacity: 0.6,
+  },
+  secondary: {
+    marginTop: 4,
+    fontSize: 15,
+    color: "#208AEF",
+  },
   container: {
     flex: 1,
     backgroundColor: "#000",
@@ -110,6 +242,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   button: {
+    alignItems: "center",
     backgroundColor: "#208AEF",
     paddingHorizontal: 20,
     paddingVertical: 12,

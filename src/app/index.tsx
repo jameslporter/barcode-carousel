@@ -9,6 +9,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   useWindowDimensions,
   View,
 } from "react-native";
@@ -16,7 +17,9 @@ import {
 import { BarcodeImage } from "@/components/barcode-image";
 import {
   deleteBarcode,
+  displayName,
   loadBarcodes,
+  renameBarcode,
   type SavedBarcode,
   typeLabel,
 } from "@/lib/barcodes";
@@ -26,6 +29,8 @@ export default function Home() {
   const [barcodes, setBarcodes] = useState<SavedBarcode[] | null>(null);
   const [index, setIndex] = useState(0);
   const [listHeight, setListHeight] = useState(0);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draftName, setDraftName] = useState("");
 
   // Reload whenever the screen comes back into focus, e.g. after scanning.
   useFocusEffect(
@@ -47,13 +52,25 @@ export default function Home() {
     if (next !== index) setIndex(next);
   };
 
+  const startRename = (item: SavedBarcode) => {
+    setDraftName(item.name ?? "");
+    setEditingId(item.id);
+  };
+
+  const finishRename = async () => {
+    if (!editingId) return;
+    const id = editingId;
+    setEditingId(null);
+    setBarcodes(await renameBarcode(id, draftName));
+  };
+
   const remove = (item: SavedBarcode) => {
     const doDelete = async () => setBarcodes(await deleteBarcode(item.id));
     if (Platform.OS === "web") {
-      if (window.confirm(`Delete this ${typeLabel(item.type)}?`)) doDelete();
+      if (window.confirm(`Delete "${displayName(item)}"?`)) doDelete();
       return;
     }
-    Alert.alert("Delete barcode?", `${typeLabel(item.type)}: ${item.data}`, [
+    Alert.alert(`Delete "${displayName(item)}"?`, `${typeLabel(item.type)}: ${item.data}`, [
       { text: "Cancel", style: "cancel" },
       { text: "Delete", style: "destructive", onPress: doDelete },
     ]);
@@ -102,13 +119,46 @@ export default function Home() {
                 maxWidth={cardWidth - 32}
                 maxHeight={cardMaxHeight}
               />
-              <Text style={styles.type}>{typeLabel(item.type)}</Text>
-              <Text style={styles.data} numberOfLines={2} selectable>
-                {item.data}
+              <Text style={styles.meta} numberOfLines={2} selectable>
+                {typeLabel(item.type)} · {item.data}
               </Text>
-              <Pressable onPress={() => remove(item)} hitSlop={8}>
-                <Text style={styles.delete}>Delete</Text>
-              </Pressable>
+              <View style={styles.actions}>
+                <Pressable onPress={() => startRename(item)} hitSlop={8}>
+                  <Text style={styles.action}>Rename</Text>
+                </Pressable>
+                <Pressable onPress={() => remove(item)} hitSlop={8}>
+                  <Text style={[styles.action, styles.delete]}>Delete</Text>
+                </Pressable>
+              </View>
+              <View style={styles.nameRow}>
+                {editingId === item.id ? (
+                  <TextInput
+                    style={[styles.name, styles.nameInput]}
+                    value={draftName}
+                    onChangeText={setDraftName}
+                    onSubmitEditing={finishRename}
+                    onBlur={finishRename}
+                    placeholder="Name this barcode"
+                    autoFocus
+                    maxLength={60}
+                    returnKeyType="done"
+                    accessibilityLabel="Barcode name"
+                  />
+                ) : (
+                  <Pressable
+                    onPress={() => startRename(item)}
+                    accessibilityRole="button"
+                    accessibilityHint="Rename this barcode"
+                  >
+                    <Text
+                      style={[styles.name, !item.name && styles.nameMissing]}
+                      numberOfLines={2}
+                    >
+                      {displayName(item)}
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
             </View>
           </View>
         )}
@@ -150,23 +200,46 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 4,
   },
-  type: {
+  meta: {
     marginTop: 4,
-    fontSize: 13,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
+    fontSize: 14,
     color: "#5F6B7A",
+    textAlign: "center",
   },
-  data: {
-    fontSize: 16,
+  actions: {
+    flexDirection: "row",
+    gap: 24,
+  },
+  action: {
+    fontSize: 15,
+    color: "#208AEF",
+  },
+  delete: {
+    color: "#D93025",
+  },
+  nameRow: {
+    alignSelf: "stretch",
+    marginTop: 6,
+    paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "#D5DAE0",
+    alignItems: "center",
+  },
+  name: {
+    fontSize: 24,
+    fontWeight: "700",
     color: "#111",
     textAlign: "center",
   },
-  delete: {
-    marginTop: 4,
-    fontSize: 15,
-    color: "#D93025",
+  nameMissing: {
+    color: "#8A94A0",
+    fontWeight: "600",
+  },
+  nameInput: {
+    alignSelf: "stretch",
+    paddingVertical: 4,
+    borderBottomWidth: 2,
+    borderBottomColor: "#208AEF",
   },
   dots: {
     flexDirection: "row",
