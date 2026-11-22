@@ -1,0 +1,52 @@
+name: EAS Update
+
+# Publishes an over-the-air update to the "production" channel on every push
+# to main, so installed production builds pick up JS/asset changes.
+# Requires an EXPO_TOKEN repository secret (expo.dev > Account settings >
+# Access tokens). Without it, the publish step is skipped.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: EAS Update channel to publish to
+        default: production
+        required: true
+
+concurrency:
+  group: eas-update
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - name: Check for EXPO_TOKEN
+        if: env.EXPO_TOKEN == ''
+        run: echo "::notice::EXPO_TOKEN secret is not set; skipping EAS Update."
+
+      - uses: actions/checkout@v4
+        if: env.EXPO_TOKEN != ''
+
+      - uses: actions/setup-node@v4
+        if: env.EXPO_TOKEN != ''
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: expo/expo-github-action@v8
+        if: env.EXPO_TOKEN != ''
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - run: npm ci
+        if: env.EXPO_TOKEN != ''
+
+      - name: Publish update
+        if: env.EXPO_TOKEN != ''
+        run: eas update --channel "${{ inputs.channel || 'production' }}" --auto --non-interactive
