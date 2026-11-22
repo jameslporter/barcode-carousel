@@ -14,7 +14,7 @@
       "url": "https://u.expo.dev/abd294dc-0550-47f3-b20c-f25e7ca75a19"
     },
     "ios": {
-      "bundleIdentifier": "com.jameslporter.barcodecarousel",
+      "bundleIdentifier": "com.hackerswagger.barcodecarousel",
       "icon": "./assets/expo.icon",
       "infoPlist": {
         "RCTAsyncStorageExcludeFromBackup": false
@@ -24,7 +24,7 @@
       }
     },
     "android": {
-      "package": "com.jameslporter.barcodecarousel",
+      "package": "com.hackerswagger.barcodecarousel",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
