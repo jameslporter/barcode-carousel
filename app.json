@@ -7,13 +7,24 @@
     "icon": "./assets/images/icon.png",
     "scheme": "barcodecarousel",
     "userInterfaceStyle": "automatic",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/abd294dc-0550-47f3-b20c-f25e7ca75a19"
+    },
     "ios": {
+      "bundleIdentifier": "com.hackerswagger.barcodecarousel",
       "icon": "./assets/expo.icon",
       "infoPlist": {
         "RCTAsyncStorageExcludeFromBackup": false
+      },
+      "config": {
+        "usesNonExemptEncryption": false
       }
     },
     "android": {
+      "package": "com.hackerswagger.barcodecarousel",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -48,6 +59,11 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "abd294dc-0550-47f3-b20c-f25e7ca75a19"
+      }
     }
   }
 }
